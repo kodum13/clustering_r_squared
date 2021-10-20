@@ -1,0 +1,75 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.cluster import KMeans
+
+df = pd.read_csv('~/Mall_Customers.csv')
+df.rename(index=str, columns={'Annual Income (k$)': 'Income',
+                              'Spending Score (1-100)': 'Score'}, inplace=True)
+
+print(df.info())
+
+# Set the columns that will be used as inputs and the maximum number of clusters
+inputs = ['Income', 'Score']
+max_clusters = 10
+
+n = df.count()
+print("Number of Observations :", n)
+
+# Loop over each number of clusters to calculate the respective R2 value
+r2_results = []
+for q in range(2,max_clusters):
+
+    # NxP data matrix
+    Y = df[inputs]
+
+    # Clustering using KMeans
+    km = KMeans(n_clusters=q).fit(Y)
+    Y['Labels'] = km.labels_
+
+    Y_matrix = Y[inputs]
+    
+    # QxP matrix of cluster means
+    M = km.cluster_centers_
+    print("Centroids :", M)
+
+    # cluster indicator (xik=1 if obs. i in cluster k)
+    X = pd.get_dummies(Y.set_index(Y.index)["Labels"]).max(level=0)
+
+    # Check dimensions of matrices
+    print("Y shape", Y_matrix.shape)
+    Y_trans = Y_matrix.T
+    print("Y_trans ", Y_trans.shape)
+    T = Y_trans.dot(Y_matrix)
+    print("T dimensions ", T.shape)
+    print("T (total matrix):", T)
+
+    print("X dimensions ", X.shape)
+    X_X = X.T.dot(X)
+    df_inv = pd.DataFrame(np.linalg.pinv(X_X.values), X_X.columns, X_X.index)
+    B_hat = (df_inv.dot(X.T)).dot(Y_matrix)
+    B = B_hat.T.dot(X_X).dot(B_hat)
+    print("B (between clusters):", B)
+
+    W = T-B
+    print("W (within clusters):", W)
+
+    W_trace = np.trace(W)
+    print("W_trace: ", W_trace)
+
+    T_trace = np.trace(T)
+    print("T_trace: ", T_trace)
+
+    R_squared = 1 - W_trace/T_trace
+    print("R squared :", R_squared)
+
+    r2_results.append(R_squared)
+
+cluster_num = range(2,max_clusters)
+print(r2_results)
+
+plt.plot(cluster_num, r2_results)
+plt.title("R-squared by Cluster Number")
+plt.xlabel("Number of Clusters")
+plt.ylabel("R-squared")
+plt.show()
